@@ -3,12 +3,10 @@ Helpers to support streaming generate output.
 Borrowed from https://github.com/oobabooga/text-generation-webui/blob/ad37f396fc8bcbab90e11ecf17c56c97bfbd4a9c/modules/callbacks.py
 """
 
-import gc
 import traceback
 from queue import Queue
 from threading import Thread
 
-import torch
 import transformers
 
 

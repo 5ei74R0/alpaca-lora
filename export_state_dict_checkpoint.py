@@ -2,9 +2,10 @@ import json
 import os
 
 import torch
-import transformers
 from peft import PeftModel
+
 from transformers import LlamaForCausalLM, LlamaTokenizer  # noqa: E402
+
 
 BASE_MODEL = os.environ.get("BASE_MODEL", None)
 assert (
@@ -49,25 +50,15 @@ n_heads = params["n_heads"]
 dim = params["dim"]
 dims_per_head = dim // n_heads
 base = 10000.0
-inv_freq = 1.0 / (
-    base ** (torch.arange(0, dims_per_head, 2).float() / dims_per_head)
-)
+inv_freq = 1.0 / (base ** (torch.arange(0, dims_per_head, 2).float() / dims_per_head))
 
 
 def permute(w):
-    return (
-        w.view(n_heads, dim // n_heads // 2, 2, dim)
-        .transpose(1, 2)
-        .reshape(dim, dim)
-    )
+    return w.view(n_heads, dim // n_heads // 2, 2, dim).transpose(1, 2).reshape(dim, dim)
 
 
 def unpermute(w):
-    return (
-        w.view(n_heads, 2, dim // n_heads // 2, dim)
-        .transpose(1, 2)
-        .reshape(dim, dim)
-    )
+    return w.view(n_heads, 2, dim // n_heads // 2, dim).transpose(1, 2).reshape(dim, dim)
 
 
 def translate_state_dict_key(k):  # noqa: C901

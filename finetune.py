@@ -4,8 +4,10 @@ from typing import List
 
 import fire
 import torch
-import transformers
 from datasets import load_dataset
+
+import transformers
+
 
 """
 Unused imports:
@@ -20,8 +22,8 @@ from peft import (
     prepare_model_for_int8_training,
     set_peft_model_state_dict,
 )
-from transformers import LlamaForCausalLM, LlamaTokenizer
 
+from transformers import LlamaForCausalLM, LlamaTokenizer
 from utils.prompter import Prompter
 
 
@@ -83,9 +85,7 @@ def train(
             f"resume_from_checkpoint: {resume_from_checkpoint or False}\n"
             f"prompt template: {prompt_template_name}\n"
         )
-    assert (
-        base_model
-    ), "Please specify a --base_model, e.g. --base_model='huggyllama/llama-7b'"
+    assert base_model, "Please specify a --base_model, e.g. --base_model='huggyllama/llama-7b'"
     gradient_accumulation_steps = batch_size // micro_batch_size
 
     prompter = Prompter(prompt_template_name)
@@ -98,9 +98,7 @@ def train(
         gradient_accumulation_steps = gradient_accumulation_steps // world_size
 
     # Check if parameter passed or if set within environ
-    use_wandb = len(wandb_project) > 0 or (
-        "WANDB_PROJECT" in os.environ and len(os.environ["WANDB_PROJECT"]) > 0
-    )
+    use_wandb = len(wandb_project) > 0 or ("WANDB_PROJECT" in os.environ and len(os.environ["WANDB_PROJECT"]) > 0)
     # Only overwrite environ if wandb param passed
     if len(wandb_project) > 0:
         os.environ["WANDB_PROJECT"] = wandb_project
@@ -118,9 +116,7 @@ def train(
 
     tokenizer = LlamaTokenizer.from_pretrained(base_model)
 
-    tokenizer.pad_token_id = (
-        0  # unk. we want this to be different from the eos token
-    )
+    tokenizer.pad_token_id = 0  # unk. we want this to be different from the eos token
     tokenizer.padding_side = "left"  # Allow batched inference
 
     def tokenize(prompt, add_eos_token=True):
@@ -153,20 +149,14 @@ def train(
         )
         tokenized_full_prompt = tokenize(full_prompt)
         if not train_on_inputs:
-            user_prompt = prompter.generate_prompt(
-                data_point["instruction"], data_point["input"]
-            )
-            tokenized_user_prompt = tokenize(
-                user_prompt, add_eos_token=add_eos_token
-            )
+            user_prompt = prompter.generate_prompt(data_point["instruction"], data_point["input"])
+            tokenized_user_prompt = tokenize(user_prompt, add_eos_token=add_eos_token)
             user_prompt_len = len(tokenized_user_prompt["input_ids"])
 
             if add_eos_token:
                 user_prompt_len -= 1
 
-            tokenized_full_prompt["labels"] = [
-                -100
-            ] * user_prompt_len + tokenized_full_prompt["labels"][
+            tokenized_full_prompt["labels"] = [-100] * user_prompt_len + tokenized_full_prompt["labels"][
                 user_prompt_len:
             ]  # could be sped up, probably
         return tokenized_full_prompt
@@ -190,16 +180,12 @@ def train(
 
     if resume_from_checkpoint:
         # Check the available weights and load them
-        checkpoint_name = os.path.join(
-            resume_from_checkpoint, "pytorch_model.bin"
-        )  # Full checkpoint
+        checkpoint_name = os.path.join(resume_from_checkpoint, "pytorch_model.bin")  # Full checkpoint
         if not os.path.exists(checkpoint_name):
             checkpoint_name = os.path.join(
                 resume_from_checkpoint, "adapter_model.bin"
             )  # only LoRA model - LoRA config above has to fit
-            resume_from_checkpoint = (
-                False  # So the trainer won't try loading its state
-            )
+            resume_from_checkpoint = False  # So the trainer won't try loading its state
         # The two files above have a different name depending on how they were saved, but are actually the same.
         if os.path.exists(checkpoint_name):
             print(f"Restarting from {checkpoint_name}")
@@ -211,15 +197,9 @@ def train(
     model.print_trainable_parameters()  # Be more transparent about the % of trainable params.
 
     if val_set_size > 0:
-        train_val = data["train"].train_test_split(
-            test_size=val_set_size, shuffle=True, seed=42
-        )
-        train_data = (
-            train_val["train"].shuffle().map(generate_and_tokenize_prompt)
-        )
-        val_data = (
-            train_val["test"].shuffle().map(generate_and_tokenize_prompt)
-        )
+        train_val = data["train"].train_test_split(test_size=val_set_size, shuffle=True, seed=42)
+        train_data = train_val["train"].shuffle().map(generate_and_tokenize_prompt)
+        val_data = train_val["test"].shuffle().map(generate_and_tokenize_prompt)
     else:
         train_data = data["train"].shuffle().map(generate_and_tokenize_prompt)
         val_data = None
@@ -261,11 +241,9 @@ def train(
     model.config.use_cache = False
 
     old_state_dict = model.state_dict
-    model.state_dict = (
-        lambda self, *_, **__: get_peft_model_state_dict(
-            self, old_state_dict()
-        )
-    ).__get__(model, type(model))
+    model.state_dict = (lambda self, *_, **__: get_peft_model_state_dict(self, old_state_dict())).__get__(
+        model, type(model)
+    )
 
     if torch.__version__ >= "2" and sys.platform != "win32":
         model = torch.compile(model)
@@ -274,9 +252,7 @@ def train(
 
     model.save_pretrained(output_dir)
 
-    print(
-        "\n If there's a warning about missing keys above, please disregard :)"
-    )
+    print("\n If there's a warning about missing keys above, please disregard :)")
 
 
 if __name__ == "__main__":

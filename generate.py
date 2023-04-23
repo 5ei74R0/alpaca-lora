@@ -4,12 +4,13 @@ import sys
 import fire
 import gradio as gr
 import torch
-import transformers
 from peft import PeftModel
-from transformers import GenerationConfig, LlamaForCausalLM, LlamaTokenizer
 
+import transformers
+from transformers import GenerationConfig, LlamaForCausalLM, LlamaTokenizer
 from utils.callbacks import Iteratorize, Stream
 from utils.prompter import Prompter
+
 
 if torch.cuda.is_available():
     device = "cuda"
@@ -32,9 +33,7 @@ def main(
     share_gradio: bool = False,
 ):
     base_model = base_model or os.environ.get("BASE_MODEL", "")
-    assert (
-        base_model
-    ), "Please specify a --base_model, e.g. --base_model='huggyllama/llama-7b'"
+    assert base_model, "Please specify a --base_model, e.g. --base_model='huggyllama/llama-7b'"
 
     prompter = Prompter(prompt_template)
     tokenizer = LlamaTokenizer.from_pretrained(base_model)
@@ -63,9 +62,7 @@ def main(
             torch_dtype=torch.float16,
         )
     else:
-        model = LlamaForCausalLM.from_pretrained(
-            base_model, device_map={"": device}, low_cpu_mem_usage=True
-        )
+        model = LlamaForCausalLM.from_pretrained(base_model, device_map={"": device}, low_cpu_mem_usage=True)
         model = PeftModel.from_pretrained(
             model,
             lora_weights,
@@ -120,19 +117,13 @@ def main(
             # from https://github.com/oobabooga/text-generation-webui/blob/ad37f396fc8bcbab90e11ecf17c56c97bfbd4a9c/modules/text_generation.py#L216-L243.
 
             def generate_with_callback(callback=None, **kwargs):
-                kwargs.setdefault(
-                    "stopping_criteria", transformers.StoppingCriteriaList()
-                )
-                kwargs["stopping_criteria"].append(
-                    Stream(callback_func=callback)
-                )
+                kwargs.setdefault("stopping_criteria", transformers.StoppingCriteriaList())
+                kwargs["stopping_criteria"].append(Stream(callback_func=callback))
                 with torch.no_grad():
                     model.generate(**kwargs)
 
             def generate_with_streaming(**kwargs):
-                return Iteratorize(
-                    generate_with_callback, kwargs, callback=None
-                )
+                return Iteratorize(generate_with_callback, kwargs, callback=None)
 
             with generate_with_streaming(**generate_params) as generator:
                 for output in generator:
@@ -167,21 +158,11 @@ def main(
                 placeholder="Tell me about alpacas.",
             ),
             gr.components.Textbox(lines=2, label="Input", placeholder="none"),
-            gr.components.Slider(
-                minimum=0, maximum=1, value=0.1, label="Temperature"
-            ),
-            gr.components.Slider(
-                minimum=0, maximum=1, value=0.75, label="Top p"
-            ),
-            gr.components.Slider(
-                minimum=0, maximum=100, step=1, value=40, label="Top k"
-            ),
-            gr.components.Slider(
-                minimum=1, maximum=4, step=1, value=4, label="Beams"
-            ),
-            gr.components.Slider(
-                minimum=1, maximum=2000, step=1, value=128, label="Max tokens"
-            ),
+            gr.components.Slider(minimum=0, maximum=1, value=0.1, label="Temperature"),
+            gr.components.Slider(minimum=0, maximum=1, value=0.75, label="Top p"),
+            gr.components.Slider(minimum=0, maximum=100, step=1, value=40, label="Top k"),
+            gr.components.Slider(minimum=1, maximum=4, step=1, value=4, label="Beams"),
+            gr.components.Slider(minimum=1, maximum=2000, step=1, value=128, label="Max tokens"),
             gr.components.Checkbox(label="Stream output"),
         ],
         outputs=[
